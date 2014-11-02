@@ -28,28 +28,27 @@ public class UserSpringJDBCDAO implements UserDAO {
   }
 
   @Override
-  public void insert(final User user) {
+  public User insert(final NewUser newUser) {
 
-    if (user.getId() != null) {
-      throw new IllegalArgumentException("can not insert " + user + " with already assigned id");
-    }
+    // no more runtime exception
 
     final ImmutableMap<String, Object> params = ImmutableMap.of(
-            "first_name", user.getFirstName(),
-            "last_name", user.getLastName()
+            "first_name", newUser.firstName,
+            "last_name", newUser.lastName
     );
 
-    final int userId = simpleJdbcInsert.executeAndReturnKey(params).intValue();
+    final int userIdVal = simpleJdbcInsert.executeAndReturnKey(params).intValue();
 
-    user.setId(userId);
+    final UserId userId = new UserId(userIdVal);
+    return new User(userId, newUser.firstName, newUser.lastName);
   }
 
   @Override
-  public Optional<User> get(final int userId) {
+  public Optional<User> get(final UserId userId) {
 
     final String query = "SELECT user_id, first_name, last_name FROM users WHERE user_id = :user_id";
 
-    final ImmutableMap<String, Object> params = ImmutableMap.of("user_id", userId);
+    final ImmutableMap<String, Object> params = ImmutableMap.of("user_id", userId.val);
 
     final User user;
     try {
@@ -71,34 +70,32 @@ public class UserSpringJDBCDAO implements UserDAO {
   @Override
   public void update(final User user) {
 
-    if (user.getId() == null) {
-      throw new IllegalArgumentException("can not update " + user + " without id");
-    }
+    // no more runtime exception
 
     final String query = "UPDATE users SET first_name = :first_name, last_name = :last_name WHERE user_id = :user_id";
 
     final ImmutableMap<String, Object> params = ImmutableMap.of(
-            "first_name", user.getFirstName(),
-            "last_name", user.getLastName(),
-            "user_id", user.getId()
+            "first_name", user.firstName,
+            "last_name", user.lastName,
+            "user_id", user.id.val
     );
 
     namedParameterJdbcTemplate.update(query, params);
   }
 
   @Override
-  public void delete(final int userId) {
+  public void delete(final UserId userId) {
 
     final String query = "DELETE FROM users WHERE user_id = :user_id";
 
-    final ImmutableMap<String, Object> params = ImmutableMap.of("user_id", userId);
+    final ImmutableMap<String, Object> params = ImmutableMap.of("user_id", userId.val);
 
     namedParameterJdbcTemplate.update(query, params);
   }
 
   private static final RowMapper<User> rowToUser = (resultSet, rowNum) ->
-          User.existing(
-                  resultSet.getInt("user_id"),
+          new User(
+                  new UserId(resultSet.getInt("user_id")),
                   resultSet.getString("first_name"),
                   resultSet.getString("last_name")
           );
